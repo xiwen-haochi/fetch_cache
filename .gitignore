@@ -55,3 +55,7 @@ ENV/
 *.egg-info/
 *.egg
 MANIFEST
+
+.env.dev
+.env
+.env.test

@@ -8,14 +8,22 @@ import respx
 import redis
 from pathlib import Path
 import json
+from dotenv import load_dotenv
 
-base_dir = Path(__file__).parent.parent
-TEST_BASE_URL = "http://test.com/api"
-TEST_CACHE_DIR = base_dir / ".test_http_cache"
-TEST_ENDPOINT = "field_list"
-TEST_RESPONSE_DATA = {"status": "success", "data": ["field1", "field2"]}
-TEST_REDIS_CONFIG = {"host": "106.15.6.92", "port": 6378}
-TEST_CACHE_KEY = "51bd0e494f6f3566fb098d6d809073d2"
+BASE_DIR = Path(__file__).parent.parent
+env_file = os.getenv("ENV_FILE", ".env.test")
+load_dotenv(BASE_DIR / env_file)
+
+TEST_CACHE_DIR = BASE_DIR / ".test_http_cache"
+TEST_BASE_URL = os.getenv("TEST_BASE_URL")  # http://test.com/api
+TEST_ENDPOINT = os.getenv("TEST_ENDPOINT")  # field_list
+TEST_RESPONSE_DATA = json.loads(
+    os.getenv("TEST_RESPONSE_DATA")
+)  # {"status": "success", "data": ["field1", "field2"]}
+TEST_REDIS_CONFIG = json.loads(
+    os.getenv("TEST_REDIS_CONFIG")
+)  # {"host": "xxxxx", "port": 6379}
+TEST_CACHE_KEY = os.getenv("TEST_CACHE_KEY")  # 51bd0e494f6f3566fb098d6d809073d2
 
 
 @pytest.fixture
