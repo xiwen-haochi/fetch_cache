@@ -1,7 +1,8 @@
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Optional, Any
 import threading
-import pickle
+import json
+
 from .base import BaseCache
 
 
@@ -24,7 +25,7 @@ class RedisCache(BaseCache):
         :param password: 密码
         :param socket_timeout: 套接字超时时间
         :param connection_pool: 连接池配置
-        :param redis_kwargs: 其他 Redis 参数
+        :param redis_kwargs: 其他 Redis 参数，支持 cleanup_interval 参数设置默认过期时间（秒）
         """
         try:
             import redis
@@ -33,6 +34,9 @@ class RedisCache(BaseCache):
                 "Redis cache requires 'redis' package. "
                 "Install it with: pip install redis"
             )
+
+        # 提取 cleanup_interval 参数
+        self.cleanup_interval = redis_kwargs.pop("cleanup_interval", None)
 
         # 配置连接池
         pool_kwargs = connection_pool or {}
@@ -56,7 +60,7 @@ class RedisCache(BaseCache):
             if data is None:
                 return None
 
-            cache_data = pickle.loads(data)
+            cache_data = json.loads(data)
             expires = datetime.fromisoformat(cache_data["expires"])
 
             if expires > datetime.now():
@@ -69,10 +73,19 @@ class RedisCache(BaseCache):
             print(f"Redis cache read error: {e}")
             return None
 
-    def set(self, key: str, value: Any, expires: datetime) -> None:
+    def set(self, key: str, value: Any, expires: int) -> None:
+        """
+        设置缓存
+        :param key: 键
+        :param value: 值
+        :param expires: 过期时间，如果未指定且存在 cleanup_interval，则使用 cleanup_interval
+        """
         try:
-            cache_data = {"value": value, "expires": expires.isoformat()}
-            self.redis.set(key, pickle.dumps(cache_data))
+            cache_data = {
+                "value": value,
+                "expires": (datetime.now() + timedelta(seconds=expires)).isoformat(),
+            }
+            self.redis.set(key, json.dumps(cache_data), ex=expires)
         except Exception as e:
             print(f"Redis cache write error: {e}")
 

@@ -1,16 +1,14 @@
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Optional, Any
 import json
 import threading
 from pathlib import Path
-import hashlib
+
 from .base import BaseCache
 
 
 class FileCache(BaseCache):
-    def __init__(
-        self, cache_dir: Optional[str | Path] = None, cleanup_interval: int = 3600
-    ):
+    def __init__(self, cache_dir: Optional[str | Path] = None):
         if cache_dir is None:
             current_file = Path(__file__).resolve()
             self.cache_dir = current_file.parent.parent / ".cache"
@@ -21,14 +19,12 @@ class FileCache(BaseCache):
         self._lock = threading.Lock()
         self.cache_dir.mkdir(parents=True, exist_ok=True)
 
-        # 添加清理相关的属性
-        self.cleanup_interval = cleanup_interval
         self._last_cleanup = datetime.now().timestamp()
 
     def _get_cache_path(self, key: str) -> Path:
         """获取缓存文件路径"""
         # 使用 key 的 hash 值作为文件名，避免文件名过长或包含非法字符
-        filename = hashlib.md5(key.encode()).hexdigest() + ".json"
+        filename = key + ".json"
         return self.cache_dir / filename
 
     def _cleanup_expired(self) -> None:
@@ -51,16 +47,8 @@ class FileCache(BaseCache):
         except Exception as e:
             print(f"Cache cleanup error: {e}")
 
-    def _check_cleanup(self) -> None:
-        """检查是否需要执行清理操作"""
-        current_time = datetime.now().timestamp()
-        if current_time - self._last_cleanup > self.cleanup_interval:
-            self._cleanup_expired()
-            self._last_cleanup = current_time
-
     def get(self, key: str) -> Optional[Any]:
         """获取缓存值"""
-        self._check_cleanup()
         cache_path = self._get_cache_path(key)
 
         try:
@@ -81,15 +69,14 @@ class FileCache(BaseCache):
             print(f"Cache read error: {e}")
             return None
 
-    def set(self, key: str, value: Any, expires: datetime) -> None:
+    def set(self, key: str, value: Any, expires: int) -> None:
         """设置缓存值"""
-        self._check_cleanup()
         cache_path = self._get_cache_path(key)
 
         try:
             cache_data = {
                 "value": value,
-                "expires": expires.isoformat(),
+                "expires": (datetime.now() + timedelta(seconds=expires)).isoformat(),
                 "created_at": datetime.now().isoformat(),
             }
 

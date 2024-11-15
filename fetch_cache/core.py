@@ -1,13 +1,10 @@
 from datetime import datetime, timedelta
 from typing import Optional
 import httpx
-import traceback
-from fetch_cache.cache import create_cache, BaseCache
+from functools import lru_cache
+from fetch_cache.cache import create_cache
 from fetch_cache.utils.timing import timing_decorator
-import respx
-import re  # 用于正则匹配
-import time
-import asyncio
+import hashlib
 
 
 class HTTPClient(httpx.Client):
@@ -18,7 +15,6 @@ class HTTPClient(httpx.Client):
         cache_type: str = "memory",  # 默认使用内存缓存
         cache_config: Optional[dict] = None,  # 缓存配置
         cache_ttl: int = 3600,  # 缓存有效期（秒）
-        cache_cleanup_interval: Optional[int] = None,  # 清理间隔（秒）
         retry_config: Optional[dict] = None,  # 新增重试配置参数
         **kwargs,
     ):
@@ -42,14 +38,8 @@ class HTTPClient(httpx.Client):
         self.base_url = base_url
         self.headers = headers or {}
 
-        # 如果没有指定清理间隔，默认设置为缓存有效期的一半
-        if cache_cleanup_interval is None:
-            cache_cleanup_interval = cache_ttl // 2
-
         # 处理缓存配置
         cache_config = cache_config or {}
-        if cache_type in ["file", "redis", "mysql", "postgresql", "sqlite"]:
-            cache_config["cleanup_interval"] = cache_cleanup_interval
 
         # 创建缓存实例
         self.cache = create_cache(cache_type, **cache_config)
@@ -63,6 +53,19 @@ class HTTPClient(httpx.Client):
     def log_response(response):
         print(f"Response event hook: Status {response.status_code}")
 
+    @staticmethod
+    @lru_cache()
+    def get_cache_key(
+        method: str,
+        url: str,
+        params: Optional[dict] = None,
+        data: Optional[dict] = None,
+        json_data: Optional[dict] = None,
+    ) -> str:
+        """获取缓存 key"""
+        key = method + url + str(params or "") + str(data or "") + str(json_data or "")
+        return hashlib.md5(key.encode()).hexdigest()
+
     @timing_decorator
     def request(
         self,
@@ -74,7 +77,7 @@ class HTTPClient(httpx.Client):
         **kwargs,
     ):
         url = str(self.base_url) + endpoint
-        cache_key = method + url + str(data) + str(params) + str(json_data)
+        cache_key = self.get_cache_key(method, url, params, data, json_data)
 
         # 检查缓存
         cached_response = self.cache.get(cache_key)
@@ -95,9 +98,8 @@ class HTTPClient(httpx.Client):
             headers=headers,
             **kwargs,
         )
-        expires = datetime.now() + timedelta(seconds=self.cache_ttl)
         response_data = response.json()
-        self.cache.set(cache_key, response_data, expires)
+        self.cache.set(cache_key, response_data, self.cache_ttl)
         return response_data
 
 
@@ -111,7 +113,6 @@ class AsyncHTTPClient(httpx.AsyncClient):
         cache_type: str = "memory",
         cache_config: Optional[dict] = None,
         cache_ttl: int = 3600,
-        cache_cleanup_interval: Optional[int] = None,
         **kwargs,
     ):
         # 处理base_url，确保末尾没有斜杠
@@ -127,14 +128,8 @@ class AsyncHTTPClient(httpx.AsyncClient):
             **kwargs,
         )
 
-        # 如果没有指定清理间隔，默认设置为缓存有效期的一半
-        if cache_cleanup_interval is None:
-            cache_cleanup_interval = cache_ttl // 2
-
         # 处理缓存配置
         cache_config = cache_config or {}
-        if cache_type in ["file", "redis", "mysql", "postgresql", "sqlite"]:
-            cache_config["cleanup_interval"] = cache_cleanup_interval
 
         # 创建缓存实例
         self.cache = create_cache(cache_type, **cache_config)
@@ -148,6 +143,19 @@ class AsyncHTTPClient(httpx.AsyncClient):
         """记录响应信息"""
         print(f"Response event hook: {response.status_code} {response.url}")
 
+    @staticmethod
+    @lru_cache()
+    def get_cache_key(
+        method: str,
+        url: str,
+        params: Optional[dict] = None,
+        data: Optional[dict] = None,
+        json_data: Optional[dict] = None,
+    ) -> str:
+        """获取缓存 key"""
+        key = method + url + str(params or "") + str(data or "") + str(json_data or "")
+        return hashlib.md5(key.encode()).hexdigest()
+
     async def request(
         self,
         method: str,
@@ -160,8 +168,7 @@ class AsyncHTTPClient(httpx.AsyncClient):
         """重写请求方法，添加缓存支持"""
         # 处理URL，确保开头有斜杠
         url = str(self.base_url) + endpoint
-        cache_key = method + url + str(data) + str(params) + str(json_data)
-
+        cache_key = self.get_cache_key(method, url, params, data, json_data)
         # 检查缓存
         cached_response = self.cache.get(cache_key)
         if cached_response is not None:
@@ -181,9 +188,8 @@ class AsyncHTTPClient(httpx.AsyncClient):
             headers=headers,
             **kwargs,
         )
-        expires = datetime.now() + timedelta(seconds=self.cache_ttl)
         response_data = response.json()
-        self.cache.set(cache_key, response_data, expires)
+        self.cache.set(cache_key, response_data, self.cache_ttl)
         return response_data
 
 
