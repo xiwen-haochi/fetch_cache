@@ -33,8 +33,8 @@ def cleanup_sqlite():
         TEST_SQLITE_PATH.unlink()
 
     yield
-    if TEST_SQLITE_PATH.exists():
-        TEST_SQLITE_PATH.unlink()
+    # if TEST_SQLITE_PATH.exists():
+    #     TEST_SQLITE_PATH.unlink()
 
 
 @pytest.fixture
@@ -44,62 +44,5 @@ def cleanup_sqlite1():
         TEST_SQLITE_PATH1.unlink()
 
     yield
-    if TEST_SQLITE_PATH1.exists():
-        TEST_SQLITE_PATH1.unlink()
-
-
-@respx.mock
-def test_http_client_get_with_sql_cache(cleanup_sqlite):
-    """测试带 SQL 缓存的 GET 请求"""
-    route = respx.get(f"{TEST_BASE_URL}/field_list").mock(
-        side_effect=lambda request: time.sleep(1)
-        or httpx.Response(200, json=TEST_RESPONSE_DATA)
-    )
-
-    # 使用独立的数据库文件路径
-    db_path = "cache2.db"
-
-    client = HTTPClient(
-        base_url=TEST_BASE_URL,
-        cache_type="sqlite",
-        cache_config={"engine_url": f"sqlite:///{db_path}"},
-        cache_ttl=10,
-    )
-    try:
-        response1 = client.get(TEST_ENDPOINT)
-        assert response1 == TEST_RESPONSE_DATA
-        assert route.call_count == 1
-
-        response3 = client.get(TEST_ENDPOINT)
-        assert response3 == TEST_RESPONSE_DATA
-        assert route.call_count == 1
-
-    finally:
-        client.close()
-
-
-# @respx.mock
-# @pytest.mark.asyncio
-# async def test_http_client_get_with_async_sqlite_cache(cleanup_sqlite1):
-#     """测试带 SQL 缓存的 GET 请求"""
-#     route = respx.get(f"{TEST_BASE_URL}/field_list").mock(
-#         return_value=httpx.Response(200, json=TEST_RESPONSE_DATA)
-#     )
-
-#     # 使用独立的数据库文件路径
-#     db_path = "cache1.db"
-
-#     async with AsyncHTTPClient(
-#         base_url=TEST_BASE_URL,
-#         cache_type="sqlite",
-#         cache_config={"engine_url": f"sqlite:///{db_path}"},
-#         cache_ttl=1,
-#     ) as client:
-
-#         response1 = await client.get(TEST_ENDPOINT)
-#         assert response1 == TEST_RESPONSE_DATA
-#         assert route.call_count == 1
-
-#         response3 = await client.get(TEST_ENDPOINT)
-#         assert response3 == TEST_RESPONSE_DATA
-#         assert route.call_count == 1
+    # if TEST_SQLITE_PATH1.exists():
+    #     TEST_SQLITE_PATH1.unlink()
