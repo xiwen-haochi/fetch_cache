@@ -78,7 +78,6 @@ class HTTPClient(httpx.Client):
     ):
         url = str(self.base_url) + endpoint
         cache_key = self.get_cache_key(method, url, params, data, json_data)
-
         # 检查缓存
         cached_response = self.cache.get(cache_key)
         if cached_response is not None:
@@ -101,6 +100,15 @@ class HTTPClient(httpx.Client):
         response_data = response.json()
         self.cache.set(cache_key, response_data, self.cache_ttl)
         return response_data
+
+    def close(self):
+        """关闭客户端和缓存连接"""
+        # 关闭缓存连接（如果存在）
+        if hasattr(self.cache, "_engine"):
+            self.cache._engine.dispose()
+
+        # 调用父类的 close 方法
+        super().close()
 
 
 class AsyncHTTPClient(httpx.AsyncClient):
@@ -192,8 +200,17 @@ class AsyncHTTPClient(httpx.AsyncClient):
         self.cache.set(cache_key, response_data, self.cache_ttl)
         return response_data
 
+    async def close(self):
+        """关闭异步客户端和缓存连接"""
+        # 关闭缓存连接（如果存在）
+        if hasattr(self.cache, "_engine"):
+            self.cache._engine.dispose()
 
-# ���试代码
+        # 调用父类的 close 方法
+        await super().close()
+
+
+# 试代码
 # @respx.mock
 # async def test_async():
 #     async def delayed_response(request):

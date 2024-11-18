@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Optional, Any, Dict
 import json
 import threading
@@ -159,9 +159,10 @@ class SQLCache(BaseCache):
             print(f"SQL cache read error: {e}")
             return None
 
-    def set(self, key: str, value: Any, expires: datetime) -> None:
+    def set(self, key: str, value: Any, expires: int) -> None:
         try:
             with self._lock, self._get_connection() as conn:
+                expires = datetime.now() + timedelta(seconds=expires)
                 # 使用 upsert 语法（根据数据库类型可能需要调整）
                 stmt = self.cache_table.delete().where(self.cache_table.c.key == key)
                 conn.execute(stmt)

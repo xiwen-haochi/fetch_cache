@@ -27,26 +27,6 @@ class FileCache(BaseCache):
         filename = key + ".json"
         return self.cache_dir / filename
 
-    def _cleanup_expired(self) -> None:
-        """清理过期的缓存文件"""
-        try:
-            current_time = datetime.now()
-            with self._lock:
-                for cache_file in self.cache_dir.glob("*.json"):
-                    try:
-                        cache_data = json.loads(cache_file.read_text(encoding="utf-8"))
-                        expires = datetime.fromisoformat(cache_data["expires"])
-
-                        if expires <= current_time:
-                            cache_file.unlink(missing_ok=True)
-                            print(f"Deleted expired cache file: {cache_file}")
-                    except Exception as e:
-                        print(f"Error cleaning up cache file {cache_file}: {e}")
-                        # 如果文件损坏，直接删除
-                        cache_file.unlink(missing_ok=True)
-        except Exception as e:
-            print(f"Cache cleanup error: {e}")
-
     def get(self, key: str) -> Optional[Any]:
         """获取缓存值"""
         cache_path = self._get_cache_path(key)

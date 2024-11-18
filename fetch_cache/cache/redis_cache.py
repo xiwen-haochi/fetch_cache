@@ -78,7 +78,7 @@ class RedisCache(BaseCache):
         设置缓存
         :param key: 键
         :param value: 值
-        :param expires: 过期时间，如果未指定且存在 cleanup_interval，则使用 cleanup_interval
+        :param expires: 过期时间
         """
         try:
             cache_data = {
