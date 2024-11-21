@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import Optional, Any, Dict
 import threading
-import json
+
 from .base import BaseCache
 
 

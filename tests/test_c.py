@@ -20,6 +20,7 @@ TEST_SQLITE_PATH1 = BASE_DIR / "cache1.db"
 TEST_BASE_URL = "http://test.com/api"
 TEST_ENDPOINT = "field_list"
 TEST_RESPONSE_DATA = {"status": "success", "data": ["field1", "field2"]}
+TEST_RESPONSE_DATA1 = {"status": "success", "code": 200, "data": ["你好", "世界"]}
 TEST_REDIS_CONFIG = json.loads(
     os.getenv("TEST_REDIS_CONFIG")
 )  # {"host": "xxxxx", "port": 6379}

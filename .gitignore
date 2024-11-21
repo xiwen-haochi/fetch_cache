@@ -59,3 +59,7 @@ MANIFEST
 .env.dev
 .env
 .env.test
+
+*.db
+
+CHECK.md

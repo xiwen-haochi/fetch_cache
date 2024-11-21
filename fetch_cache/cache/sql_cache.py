@@ -3,6 +3,7 @@ from typing import Optional, Any, Dict
 import json
 import threading
 from contextlib import contextmanager
+
 from .base import BaseCache
 
 
@@ -150,6 +151,14 @@ class SQLCache(BaseCache):
 
                 expires = datetime.fromisoformat(result.expires)
                 if expires > datetime.now():
+                    print(
+                        "缓存命中: ",
+                        result.value,
+                        "过期时间: ",
+                        expires,
+                        "当前时间: ",
+                        datetime.now(),
+                    )
                     return json.loads(result.value)
 
                 # 过期则删除
@@ -180,7 +189,7 @@ class SQLCache(BaseCache):
 
     def delete(self, key: str) -> None:
         try:
-            with self._lock, self._get_connection() as conn:
+            with self._get_connection() as conn:
                 stmt = self.cache_table.delete().where(self.cache_table.c.key == key)
                 conn.execute(stmt)
                 conn.commit()
@@ -189,7 +198,7 @@ class SQLCache(BaseCache):
 
     def clear(self) -> None:
         try:
-            with self._lock, self._get_connection() as conn:
+            with self._get_connection() as conn:
                 conn.execute(self.cache_table.delete())
                 conn.commit()
         except Exception as e:

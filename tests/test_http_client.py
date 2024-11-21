@@ -21,6 +21,8 @@ TEST_SQLITE_PATH = BASE_DIR / "cache.db"
 TEST_SQLITE_PATH1 = BASE_DIR / "cache1.db"
 TEST_BASE_URL = "http://test.com/api"
 TEST_ENDPOINT = "field_list"
+TEST_PG_PWD = os.getenv("TEST_PG_PWD")
+TEST_PG_HOST = os.getenv("TEST_PG_HOST")
 TEST_RESPONSE_DATA = {"status": "success", "data": ["field1", "field2"]}
 TEST_REDIS_CONFIG = json.loads(
     os.getenv("TEST_REDIS_CONFIG")
@@ -272,4 +274,84 @@ async def test_http_client_get_with_async_sqlite_cache(cleanup_sqlite1):
 
         response3 = await client.get(TEST_ENDPOINT)
         assert response3 == TEST_RESPONSE_DATA
+        assert route.call_count == 1
+
+
+@respx.mock
+def test_http_client_get_with_mysql_cache():  # 添加 cleanup_cache fixture
+    """测试mysql缓存的 GET 请求"""
+    # 修复：移除多余的元组包装，正确设置 mock 路由
+    route = respx.get(f"{TEST_BASE_URL}/field_list").mock(
+        return_value=httpx.Response(200, json=TEST_RESPONSE_DATA)
+    )
+
+    # 第一次请求，应该访问实际 URL
+    with HTTPClient(
+        base_url=TEST_BASE_URL,
+        cache_type="mysql",
+        cache_config={"engine_url": "mysql+pymysql://root:123456@localhost:3306/test"},
+        cache_ttl=2,
+    ) as client:
+        response1 = client.get(TEST_ENDPOINT)
+        assert response1 == TEST_RESPONSE_DATA
+        assert route.call_count == 1
+
+        # 第二次请求，应该从缓存获取
+        response2 = client.get(TEST_ENDPOINT)
+        assert response2 == TEST_RESPONSE_DATA
+        assert route.call_count == 1
+
+
+@respx.mock
+@pytest.mark.asyncio
+async def test_http_client_get_with_async_mysql_cache():
+    """测试带 mysql 缓存的 GET 请求"""
+    route = respx.get(f"{TEST_BASE_URL}/field_list").mock(
+        return_value=httpx.Response(200, json=TEST_RESPONSE_DATA)
+    )
+
+    async with AsyncHTTPClient(
+        base_url=TEST_BASE_URL,
+        cache_type="mysql",
+        cache_config={
+            "engine_url": "mysql+pymysql://root:123456@localhost:3306/test",
+            "table_name": "async_cache",
+        },
+        cache_ttl=1,
+    ) as client:
+
+        response1 = await client.get(TEST_ENDPOINT)
+        assert response1 == TEST_RESPONSE_DATA
+        assert route.call_count == 1
+
+        response3 = await client.get(TEST_ENDPOINT)
+        assert response3 == TEST_RESPONSE_DATA
+        assert route.call_count == 1
+
+
+@respx.mock
+def test_http_client_get_with_pg_cache():  # 添加 cleanup_cache fixture
+    """测试pg缓存的 GET 请求"""
+    # 修复：移除多余的元组包装，正确设置 mock 路由
+    route = respx.get(f"{TEST_BASE_URL}/field_list").mock(
+        return_value=httpx.Response(200, json=TEST_RESPONSE_DATA)
+    )
+    from urllib.parse import quote
+
+    # 第一次请求，应该访问实际 URL
+    with HTTPClient(
+        base_url=TEST_BASE_URL,
+        cache_type="postgresql",
+        cache_config={
+            "engine_url": f"postgresql+psycopg2://root:{quote(TEST_PG_PWD)}@{TEST_PG_HOST}:5433/worksheet_manage"
+        },
+        cache_ttl=2,
+    ) as client:
+        response1 = client.get(TEST_ENDPOINT)
+        assert response1 == TEST_RESPONSE_DATA
+        assert route.call_count == 1
+
+        # 第二次请求，应该从缓存获取
+        response2 = client.get(TEST_ENDPOINT)
+        assert response2 == TEST_RESPONSE_DATA
         assert route.call_count == 1

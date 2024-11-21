@@ -4,7 +4,6 @@ from functools import lru_cache
 import hashlib
 
 from fetch_cache.cache import create_cache
-from fetch_cache.utils.timing import timing_decorator
 
 
 class HTTPClient(httpx.Client):
@@ -42,16 +41,20 @@ class HTTPClient(httpx.Client):
         cache_config = cache_config or {}
 
         # 创建缓存实例
-        self.cache = create_cache(cache_type, **cache_config)
+
         self.cache_ttl = cache_ttl
+        if cache_ttl:
+            self.cache = create_cache(cache_type, **cache_config)
 
     @staticmethod
     def log_request(request):
-        print(f"Request event hook: {request.method} {request.url}")
+        pass
+        # print(f"Request event hook: {request.method} {request.url}")
 
     @staticmethod
     def log_response(response):
-        print(f"Response event hook: Status {response.status_code}")
+        pass
+        # print(f"Response event hook: Status {response.status_code}")
 
     @staticmethod
     @lru_cache()
@@ -66,7 +69,6 @@ class HTTPClient(httpx.Client):
         key = method + url + str(params or "") + str(data or "") + str(json_data or "")
         return hashlib.md5(key.encode()).hexdigest()
 
-    @timing_decorator
     def request(
         self,
         method: str,
@@ -77,11 +79,13 @@ class HTTPClient(httpx.Client):
         **kwargs,
     ):
         url = str(self.base_url) + endpoint
+        no_cache = kwargs.pop("no_cache", False)
         cache_key = self.get_cache_key(method, url, params, data, json_data)
         # 检查缓存
-        cached_response = self.cache.get(cache_key)
-        if cached_response is not None:
-            return cached_response
+        if not no_cache and self.cache_ttl:
+            cached_response = self.cache.get(cache_key)
+            if cached_response is not None:
+                return cached_response
 
         # 正确处理 headers
         headers = self.headers.copy()
@@ -97,14 +101,21 @@ class HTTPClient(httpx.Client):
             headers=headers,
             **kwargs,
         )
-        response_data = response.json()
-        self.cache.set(cache_key, response_data, self.cache_ttl)
-        return response_data
+        if response.status_code == 200 and "application/json" in response.headers.get(
+            "content-type", ""
+        ):
+            if not no_cache and self.cache_ttl:
+                response_data = response.json()
+                self.cache.set(cache_key, response_data, self.cache_ttl)
+                return response_data
+            else:
+                return response.json()
+        return response
 
     def close(self):
         """关闭客户端和缓存连接"""
         # 关闭缓存连接（如果存在）
-        if hasattr(self.cache, "_engine"):
+        if self.cache_ttl and hasattr(self.cache, "_engine"):
             self.cache._engine.dispose()
 
         # 调用父类的 close 方法
@@ -140,16 +151,19 @@ class AsyncHTTPClient(httpx.AsyncClient):
         cache_config = cache_config or {}
 
         # 创建缓存实例
-        self.cache = create_cache(cache_type, **cache_config)
         self.cache_ttl = cache_ttl
+        if cache_ttl:
+            self.cache = create_cache(cache_type, **cache_config)
 
     async def log_request(self, request):
         """记录请求信息"""
-        print(f"Request event hook: {request.method} {request.url}")
+        pass
+        # print(f"Request event hook: {request.method} {request.url}")
 
     async def log_response(self, response):
         """记录响应信息"""
-        print(f"Response event hook: {response.status_code} {response.url}")
+        pass
+        # print(f"Response event hook: {response.status_code} {response.url}")
 
     @staticmethod
     @lru_cache()
@@ -176,11 +190,13 @@ class AsyncHTTPClient(httpx.AsyncClient):
         """重写请求方法，添加缓存支持"""
         # 处理URL，确保开头有斜杠
         url = str(self.base_url) + endpoint
-        cache_key = self.get_cache_key(method, url, params, data, json_data)
-        # 检查缓存
-        cached_response = self.cache.get(cache_key)
-        if cached_response is not None:
-            return cached_response
+        no_cache = kwargs.pop("no_cache", False)
+        if not no_cache and self.cache_ttl:
+            cache_key = self.get_cache_key(method, url, params, data, json_data)
+            # 检查缓存
+            cached_response = self.cache.get(cache_key)
+            if cached_response is not None:
+                return cached_response
 
         # 正确处理 headers
         headers = self.headers.copy()
@@ -196,49 +212,22 @@ class AsyncHTTPClient(httpx.AsyncClient):
             headers=headers,
             **kwargs,
         )
-        response_data = response.json()
-        self.cache.set(cache_key, response_data, self.cache_ttl)
-        return response_data
+        if response.status_code == 200 and "application/json" in response.headers.get(
+            "content-type", ""
+        ):
+            if not no_cache and self.cache_ttl:
+                response_data = response.json()
+                self.cache.set(cache_key, response_data, self.cache_ttl)
+                return response_data
+            else:
+                return response.json()
+        return response
 
     async def close(self):
         """关闭异步客户端和缓存连接"""
         # 关闭缓存连接（如果存在）
-        if hasattr(self.cache, "_engine"):
+        if self.cache_ttl and hasattr(self.cache, "_engine"):
             self.cache._engine.dispose()
 
         # 调用父类的 close 方法
         await super().close()
-
-
-# 试代码
-# @respx.mock
-# async def test_async():
-#     async def delayed_response(request):
-#         await asyncio.sleep(3)
-#         return httpx.Response(
-#             status_code=200, json={"data": {"bots": [{"id": 1, "name": "bot1"}]}}
-#         )
-
-#     route = respx.get(re.compile(r"http://api/v1/?/bots")).mock(
-#         side_effect=delayed_response
-#     )
-
-#     async with AsyncHTTPClient(
-#         base_url="http://api/v1", timeout=1.0, cache_type="memory"
-#     ) as client:
-#         try:
-#             print("开始异步请求...")
-#             response = await client.get("/bots")
-#             print(f"Response: {response}")
-#         except httpx.TimeoutException as e:
-#             print(f"请求超时: {e}")
-#         except Exception as e:
-#             traceback.print_exc()
-#             print(f"其他错误: {e}")
-
-#     print(f"Route called times: {route.call_count}")
-
-
-# if __name__ == "__main__":
-#     print("\n=== 运行异步测试 ===")
-#     asyncio.run(test_async())

@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Optional, Any, Dict
 import threading
 from .base import BaseCache
@@ -121,8 +121,9 @@ class DjangoCache(BaseCache):
             print(f"Django cache read error: {e}")
             return None
 
-    def set(self, key: str, value: Any, expires: datetime) -> None:
+    def set(self, key: str, value: Any, expires: int) -> None:
         """设置缓存值"""
+        expires = datetime.now() + timedelta(seconds=expires)
         try:
             if self.use_django_cache:
                 # 计算过期时间（秒）
