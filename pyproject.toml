@@ -7,7 +7,6 @@ authors = ["'fkl' <18654198191@163.com>"]
 readme = "README.md"
 packages = [{include = "fetch_cache"}]
 license = "MIT"
-keywords = ["excel", "pdf", "converter"]
 classifiers = [
     "Development Status :: 4 - Beta",
     "Intended Audience :: Developers",
