@@ -1,6 +1,5 @@
-from typing import Optional
+from typing import Optional, Dict, Any
 import httpx
-from functools import lru_cache
 import hashlib
 
 from fetch_cache.cache import create_cache
@@ -12,19 +11,10 @@ class HTTPClient(httpx.Client):
         base_url,
         headers=None,
         cache_type: str = "memory",  # 默认使用内存缓存
-        cache_config: Optional[dict] = None,  # 缓存配置
+        cache_config: Optional[Dict[str, Any]] = None,  # 缓存配置
         cache_ttl: int = 3600,  # 缓存有效期（秒）
-        retry_config: Optional[dict] = None,  # 新增重试配置参数
         **kwargs,
     ):
-        # 处理重试配置
-        if retry_config is not None:
-            transport = httpx.HTTPTransport(
-                retries=retry_config.get(
-                    "retry_limits", 3
-                )  # httpx 只支持简单的重试次数设置
-            )
-            kwargs["transport"] = transport
 
         super().__init__(
             timeout=kwargs.pop("timeout", 10),
@@ -57,30 +47,33 @@ class HTTPClient(httpx.Client):
         # print(f"Response event hook: Status {response.status_code}")
 
     @staticmethod
-    @lru_cache()
     def get_cache_key(
         method: str,
         url: str,
-        params: Optional[dict] = None,
-        data: Optional[dict] = None,
-        json_data: Optional[dict] = None,
+        params: Optional[Dict[str, Any]] = None,
+        data: Optional[Dict[str, Any]] = None,
+        json: Optional[Dict[str, Any]] = None,
     ) -> str:
         """获取缓存 key"""
-        key = method + url + str(params or "") + str(data or "") + str(json_data or "")
+        params_str = str(params or "")
+        data_str = str(data or "")
+        json_str = str(json or "")
+
+        key = method + url + params_str + data_str + json_str
         return hashlib.md5(key.encode()).hexdigest()
 
     def request(
         self,
         method: str,
         endpoint: str,
-        params: Optional[dict] = None,
-        data: Optional[dict] = None,
-        json_data: Optional[dict] = None,
+        params: Optional[Dict[str, Any]] = None,
+        data: Optional[Dict[str, Any]] = None,
+        json: Optional[Dict[str, Any]] = None,
         **kwargs,
     ):
         url = str(self.base_url) + endpoint
         no_cache = kwargs.pop("no_cache", False)
-        cache_key = self.get_cache_key(method, url, params, data, json_data)
+        cache_key = self.get_cache_key(method, url, params, data, json)
         # 检查缓存
         if not no_cache and self.cache_ttl:
             cached_response = self.cache.get(cache_key)
@@ -97,7 +90,7 @@ class HTTPClient(httpx.Client):
             url=url,
             params=params,
             data=data,
-            json=json_data,
+            json=json,
             headers=headers,
             **kwargs,
         )
@@ -130,11 +123,10 @@ class AsyncHTTPClient(httpx.AsyncClient):
         base_url,
         headers=None,
         cache_type: str = "memory",
-        cache_config: Optional[dict] = None,
+        cache_config: Optional[Dict[str, Any]] = None,
         cache_ttl: int = 3600,
         **kwargs,
     ):
-        # 处理base_url，确保末尾没有斜杠
         base_url = base_url.rstrip("/")
         super().__init__(
             base_url=base_url,
@@ -149,7 +141,8 @@ class AsyncHTTPClient(httpx.AsyncClient):
 
         # 处理缓存配置
         cache_config = cache_config or {}
-
+        self.base_url = base_url
+        self.headers = headers or {}
         # 创建缓存实例
         self.cache_ttl = cache_ttl
         if cache_ttl:
@@ -166,25 +159,29 @@ class AsyncHTTPClient(httpx.AsyncClient):
         # print(f"Response event hook: {response.status_code} {response.url}")
 
     @staticmethod
-    @lru_cache()
     def get_cache_key(
         method: str,
         url: str,
-        params: Optional[dict] = None,
-        data: Optional[dict] = None,
-        json_data: Optional[dict] = None,
+        params: Optional[Dict[str, Any]] = None,
+        data: Optional[Dict[str, Any]] = None,
+        json: Optional[Dict[str, Any]] = None,
     ) -> str:
         """获取缓存 key"""
-        key = method + url + str(params or "") + str(data or "") + str(json_data or "")
+        # 将字典转换为排序后的元组，确保生成稳定的字符串表示
+        params_str = str(params or "")
+        data_str = str(data or "")
+        json_str = str(json or "")
+
+        key = method + url + params_str + data_str + json_str
         return hashlib.md5(key.encode()).hexdigest()
 
     async def request(
         self,
         method: str,
         endpoint: str,
-        params: Optional[dict] = None,
-        data: Optional[dict] = None,
-        json_data: Optional[dict] = None,
+        params: Optional[Dict[str, Any]] = None,
+        data: Optional[Dict[str, Any]] = None,
+        json: Optional[Dict[str, Any]] = None,
         **kwargs,
     ) -> httpx.Response:
         """重写请求方法，添加缓存支持"""
@@ -192,7 +189,8 @@ class AsyncHTTPClient(httpx.AsyncClient):
         url = str(self.base_url) + endpoint
         no_cache = kwargs.pop("no_cache", False)
         if not no_cache and self.cache_ttl:
-            cache_key = self.get_cache_key(method, url, params, data, json_data)
+            print(f"cache_key: {method}, {url}, {params}, {data}, {json}")
+            cache_key = self.get_cache_key(method, url, params, data, json)
             # 检查缓存
             cached_response = self.cache.get(cache_key)
             if cached_response is not None:
@@ -208,7 +206,7 @@ class AsyncHTTPClient(httpx.AsyncClient):
             url=url,
             params=params,
             data=data,
-            json=json_data,
+            json=json,
             headers=headers,
             **kwargs,
         )

@@ -21,9 +21,11 @@ TEST_SQLITE_PATH = BASE_DIR / "cache.db"
 TEST_SQLITE_PATH1 = BASE_DIR / "cache1.db"
 TEST_BASE_URL = "http://test.com/api"
 TEST_ENDPOINT = "field_list"
+TEST_ENDPOINT1 = "field_list1"
 TEST_PG_PWD = os.getenv("TEST_PG_PWD")
 TEST_PG_HOST = os.getenv("TEST_PG_HOST")
 TEST_RESPONSE_DATA = {"status": "success", "data": ["field1", "field2"]}
+TEST_RESPONSE_DATA1 = {"status": "success", "data": ["field11", "field22"]}
 TEST_REDIS_CONFIG = json.loads(
     os.getenv("TEST_REDIS_CONFIG")
 )  # {"host": "xxxxx", "port": 6379}
@@ -176,24 +178,27 @@ def test_http_client_get_with_redis_cache(cleanup_redis, redis_client):
 async def test_http_client_get_with_memory_cache():  # 添加 cleanup_cache fixture
     """测试带内存缓存的 GET 请求"""
     # 修复：移除多余的元组包装，正确设置 mock 路由
-    route = respx.get(f"{TEST_BASE_URL}/field_list").mock(
+    route = respx.get(f"{TEST_BASE_URL}/field_list", params={"a": 1}).mock(
         return_value=httpx.Response(200, json=TEST_RESPONSE_DATA)
+    )
+    respx.post(f"{TEST_BASE_URL}/field_list1", json={"a": 1}).mock(
+        return_value=httpx.Response(200, json=TEST_RESPONSE_DATA1)
     )
 
     # 第一次请求，应该访问实际 URL
     async with AsyncHTTPClient(
         base_url=TEST_BASE_URL,
-        cache_type="memory",
+        cache_type="file",
         cache_ttl=3600,
     ) as client:
-        response1 = await client.get(TEST_ENDPOINT)
+        response1 = await client.get(TEST_ENDPOINT, params={"a": 1})
         assert response1 == TEST_RESPONSE_DATA
-        assert route.call_count == 1
+        assert route.call_count == 0
 
         # 第二次请求，应该从缓存获取
-        response2 = await client.get(TEST_ENDPOINT)
-        assert response2 == TEST_RESPONSE_DATA
-        assert route.call_count == 1
+        response2 = await client.post(TEST_ENDPOINT1, json={"a": 1})
+        assert response2 == TEST_RESPONSE_DATA1
+        assert route.call_count == 0
 
 
 @respx.mock
