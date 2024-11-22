@@ -105,6 +105,36 @@ class HTTPClient(httpx.Client):
                 return response.json()
         return response
 
+    def get(self, endpoint: str, params: Optional[Dict[str, Any]] = None, **kwargs):
+        """Convenience method for GET requests"""
+        return self.request("GET", endpoint, params=params, **kwargs)
+
+    def post(
+        self,
+        endpoint: str,
+        data: Optional[Dict[str, Any]] = None,
+        json: Optional[Dict[str, Any]] = None,
+        params: Optional[Dict[str, Any]] = None,
+        **kwargs,
+    ):
+        """Convenience method for POST requests"""
+        return self.request(
+            "POST", endpoint, data=data, json=json, params=params, **kwargs
+        )
+
+    def put(
+        self,
+        endpoint: str,
+        data: Optional[Dict[str, Any]] = None,
+        json: Optional[Dict[str, Any]] = None,
+        params: Optional[Dict[str, Any]] = None,
+        **kwargs,
+    ):
+        """Convenience method for PUT requests"""
+        return self.request(
+            "PUT", endpoint, data=data, json=json, params=params, **kwargs
+        )
+
     def close(self):
         """关闭客户端和缓存连接"""
         # 关闭缓存连接（如果存在）
@@ -220,6 +250,38 @@ class AsyncHTTPClient(httpx.AsyncClient):
             else:
                 return response.json()
         return response
+
+    async def get(
+        self, endpoint: str, params: Optional[Dict[str, Any]] = None, **kwargs
+    ):
+        """Convenience method for async GET requests"""
+        return await self.request("GET", endpoint, params=params, **kwargs)
+
+    async def post(
+        self,
+        endpoint: str,
+        data: Optional[Dict[str, Any]] = None,
+        json: Optional[Dict[str, Any]] = None,
+        params: Optional[Dict[str, Any]] = None,
+        **kwargs,
+    ):
+        """Convenience method for async POST requests"""
+        return await self.request(
+            "POST", endpoint, data=data, json=json, params=params, **kwargs
+        )
+
+    async def put(
+        self,
+        endpoint: str,
+        data: Optional[Dict[str, Any]] = None,
+        json: Optional[Dict[str, Any]] = None,
+        params: Optional[Dict[str, Any]] = None,
+        **kwargs,
+    ):
+        """Convenience method for async PUT requests"""
+        return await self.request(
+            "PUT", endpoint, data=data, json=json, params=params, **kwargs
+        )
 
     async def close(self):
         """关闭异步客户端和缓存连接"""
