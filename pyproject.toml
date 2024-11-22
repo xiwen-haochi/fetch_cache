@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "fetch_cache"
-version = "0.1.0"
+version = "0.1.1"
 description = "An HTTP client with multiple cache backends to optimize repeated request performance"
 keywords = ["http", "cache", "httpx", "db", "sql", "redis", "mongo", "django"]
 authors = ["'fkl' <18654198191@163.com>"]
