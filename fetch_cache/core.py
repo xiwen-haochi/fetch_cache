@@ -197,7 +197,6 @@ class AsyncHTTPClient(httpx.AsyncClient):
         json: Optional[Dict[str, Any]] = None,
     ) -> str:
         """获取缓存 key"""
-        # 将字典转换为排序后的元组，确保生成稳定的字符串表示
         params_str = str(params or "")
         data_str = str(data or "")
         json_str = str(json or "")

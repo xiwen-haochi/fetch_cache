@@ -169,7 +169,37 @@ client = HTTPClient(
     cache_ttl=3600
 )
 ```
+### 扩展
+```python
+from fetch_cache import HTTPClient
+from datetime import datetime
+import time
 
+
+
+class FC(HTTPClient):
+    def field_list(self, params: dict = None):
+        """获取字段列表"""
+        response = self.get("field_list", params=params, no_cache=True)
+        return {str(i["id"]): i["name"] for i in response["data"]}
+
+
+http_big_client = FC(
+    base_url=f"http://11111.11.11/kong/user/",
+    headers={"Authorization": "bearer xxxx"},
+    cache_type="file",
+    cache_config={"cache_dir": "./cache"},
+    cache_ttl=10,
+)
+
+
+if __name__ == "__main__":
+    resp = http_big_client.field_list()
+    print(resp)
+    resp = http_big_client.field_list()
+    print(resp)
+
+```
 各数据库的 engine_url 格式:
 
 - MySQL: `mysql+pymysql://user:pass@localhost/dbname`
